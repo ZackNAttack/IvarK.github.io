@@ -2996,15 +2996,6 @@ function toggle_mode(id) {
 	else if ((id=="ngp"||id=="ngpp"||id=="ngmm"||id=="rs")&&modes[id]===true) modes[id]=2
 	else modes[id]=!modes[id]
 	document.getElementById(id+"Btn").textContent=(id=="rs"?"Respecced":id=="ngpp"?"NG++":id=="ngp"?"NG+":id=="ngmm"?"NG--":"NG-")+": "+(id=="rs"?(modes.rs>1?"Infinity":modes.rs>0?"Eternity":"NONE"):modes[id]>1?"NG"+(id=="ngp"?"^"+(modes[id]>2?"+-":""):id=="ngpp"?(modes[id]>2?"Ud":"+++"):"---"):modes[id]?"ON":"OFF")
-	if (id=="ngpp"&&modes.ngpp) {
-		if (!modes.ngp) toggle_mode("ngp")
-		modes.rs=0
-		document.getElementById("rsBtn").textContent="Respecced: NONE"
-	}
-	if (id=="rs"&&modes.rs) {
-		modes.ngpp=0
-		document.getElementById("ngppBtn").textContent="NG++: OFF"
-	}
 }
 
 function toggleOfflineProgress() {
