@@ -7247,7 +7247,7 @@ function gameLoop(diff) {
     if ((player.infinitied > 0 || player.infinityPoints.gt(0) || player.eternities !== 0 || quantumed) && !isEmptiness) {
         document.getElementById("infinitybtn").style.display = "inline-block";
         document.getElementById("challengesbtn").style.display = "inline-block";
-        if (player.infinityUpgradesRespecced==undefined) {
+        if (true) {
             document.getElementById("infi11").className = "infinistorebtn1"
             document.getElementById("infi21").className = "infinistorebtn2"
             if (player.infinityUpgrades.includes("timeMult")) document.getElementById("infi12").className = "infinistorebtn1"
