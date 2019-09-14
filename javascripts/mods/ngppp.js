@@ -376,6 +376,15 @@ function drawMasteryTree() {
 }
 
 function setupText() {
+	var pu=document.getElementById("pUpgs")
+	for (r=1;r<=puSizes.y;r++) {
+		row=pu.insertRow(r-1)
+		for (c=1;c<=puSizes.x;c++) {
+			var col=row.insertCell(c-1)
+			var id=(r*10+c)
+			col.innerHTML="<button id='pu"+id+"' class='infinistorebtn1' onclick='buyPU("+id+","+(r<2)+")'>"+(typeof(puDescs[id])=="function"?"<span id='pud"+id+"'></span>":puDescs[id]||"???")+(puMults[id]?"<br>Currently: <span id='pue"+id+"'></span>":"")+"<br><span id='puc"+id+"'></span></button>"
+		}
+	}
 	var iut=document.getElementById("preinfupgrades")
 	for (r=1;r<5;r++) {
 		row=iut.insertRow(r-1)
@@ -457,6 +466,7 @@ function setupText() {
 		}
 	}
 	var ndsDiv = document.getElementById("parent")
+	var pdsDiv = document.getElementById("pdTable")
 	var edsDiv = document.getElementById("empDimTable")
 	for (d=1;d<9;d++) {
 		var row=ndsDiv.insertRow(d-1)
@@ -466,6 +476,14 @@ function setupText() {
 		html+='<td id="A'+d+'"></td>'
 		html+='<td align="right" width="10%"><button id="B'+d+'" style="color:black; height: 25px; font-size: 10px; width: 135px" class="storebtn" onclick="buyOneDimension('+d+')"></button></td>'
 		html+='<td align="right" width="10%"><button id="M'+d+'" style="color:black; width:210px; height: 25px; font-size: 10px" class="storebtn" onclick="buyManyDimension('+d+')"></button></td>'
+		row.innerHTML=html
+		
+		var row=pdsDiv.insertRow(d-1)
+		row.id="pR"+d
+		row.style["font-size"]="16px"
+		var html='<td id="pD'+d+'" width="41%">'+DISPLAY_NAMES[d]+' Paradox Dimension x1</td>'
+		html+='<td id="pA'+d+'">0 (0)</td>'
+		html+='<td align="right" width="10%"><button id="pB'+d+'" style="color:black; width:195px; height:30px" class="storebtn" align="right" onclick="buyPD('+d+')">Cost: ??? Px</button></td></tr>'
 		row.innerHTML=html
 		
 		var row=edsDiv.insertRow(d-1)
@@ -1398,19 +1416,21 @@ function breakLimit() {
 
 //v1.9984
 function maxAllID() {
+	if (player.pSac !== undefined) maxAllIDswithAM()
 	for (t=1;t<9;t++) {
 		var dim=player["infinityDimension"+t]
+        var cost=getIDCost(t)
 		if (player.infDimensionsUnlocked[t-1]&&player.infinityPoints.gte(dim.cost)) {
 			var costMult=getIDCostMult(t)
 			if (player.infinityPoints.lt(Decimal.pow(10, 1e10))) {
-				var toBuy=Math.max(Math.floor(player.infinityPoints.div(9-t).div(dim.cost).times(costMult-1).add(1).log(costMult)),1)
-				var toSpend=Decimal.pow(costMult,toBuy).sub(1).div(costMult-1).times(dim.cost).round()
+				var toBuy=Math.max(Math.floor(player.infinityPoints.div(9-t).div(cost).times(costMult-1).add(1).log(costMult)),1)
+				var toSpend=Decimal.pow(costMult,toBuy).sub(1).div(costMult-1).times(cost).round()
 				if (toSpend.gt(player.infinityPoints)) player.infinityPoints=new Decimal(0)
 				else player.infinityPoints=player.infinityPoints.sub(toSpend)
-			} else var toBuy = Math.floor(player.infinityPoints.div(dim.cost).log(costMult))
+			} else var toBuy = Math.floor(player.infinityPoints.div(cost).log(costMult))
 			dim.amount=dim.amount.add(toBuy*10)
 			dim.baseAmount+=toBuy*10
-			dim.power=dim.power.times(Decimal.pow(infPowerMults[t],toBuy))
+			dim.power=dim.power.times(Decimal.pow(getInfBuy10Mult(t),toBuy))
 			dim.cost=dim.cost.times(Decimal.pow(costMult,toBuy))
 		}
 	}
@@ -1429,6 +1449,7 @@ function hideMaxIDButton(onLoad=false) {
 			}
 		}
 	}
+	if (player.pSac !== undefined) hide=false
 	document.getElementById("maxAllID").style.display=hide?"none":""
 }
 
@@ -2068,7 +2089,7 @@ function getTreeUpgradeEffect(upg) {
 	if (upg==5) return Math.pow(Math.log10(player.meta.bestOverQuantums.add(1).log10()+1)/5+1,Math.sqrt(lvl))
 	if (upg==6) return Decimal.pow(2, lvl)
 	if (upg==7) return Decimal.pow(player.replicanti.amount.max(1).log10()+1, 0.25*lvl)
-	if (upg==8) return Math.log10(player.meta.bestAntimatter.add(1).log10()+1)/4*Math.sqrt(lvl)
+	if (upg==8) return Math.log10(Decimal.add(player.meta.bestAntimatter,1).log10()+1)/4*Math.sqrt(lvl)
 	return 0
 }
 
@@ -2710,7 +2731,7 @@ function switchAB() {
 		interval: data.sacrifice.time,
 		cost: player.autoSacrifice.cost,
 		bulk: 1,
-		priority: data.sacrifice.priority,
+		priority: data.sacrifice.amount,
 		tier: 1,
 		target: 13,
 		ticks: 0,
@@ -3059,7 +3080,12 @@ function maxBuyBEEPMult() {
 function getGHPGain() {
 	if (player.masterystudies == undefined) return new Decimal(0)
 	if (!tmp.qu.bigRip.active) return new Decimal(0)
-	return tmp.qu.bigRip.bestThisRun.div(Decimal.pow(10,getQCGoal())).pow(2/getQCGoal()).times(Decimal.pow(2,player.ghostify.multPower-1)).floor()
+	let log=(tmp.qu.bigRip.bestThisRun.log10()/getQCGoal()-1)*2
+	if (player.aarexModifications.nguepV) {
+		if (log>1e4) log=Math.sqrt(1e4*log)
+		if (log>2e4) log=Math.pow(4e8*log,1/3)
+	}
+	return Decimal.pow(10, log).times(Decimal.pow(2,player.ghostify.multPower-1)).floor()
 }
 
 ghostified = false
@@ -3170,6 +3196,7 @@ function ghostifyReset(implode, gain, amount, force) {
 		thisInfinityTime: 0,
 		resets: 0,
 		dbPower: player.dbPower,
+        tdBoosts: resetTDBoosts(),
 		tickspeedBoosts: player.tickspeedBoosts !== undefined ? 16 : undefined,
 		galaxies: 0,
 		galacticSacrifice: resetGalacticSacrifice(),
@@ -3206,7 +3233,7 @@ function ghostifyReset(implode, gain, amount, force) {
 		overXGalaxies: player.overXGalaxies,
 		overXGalaxiesTickspeedBoost: player.tickspeedBoosts == undefined ? player.overXGalaxiesTickspeedBoost : 0,
 		spreadingCancer: player.spreadingCancer,
-		postChallUnlocked: 8,
+		postChallUnlocked: player.achievements.includes("r133") ? order.length : 0,
 		postC4Tier: 0,
 		postC3Reward: new Decimal(1),
 		eternityPoints: new Decimal(0),
@@ -3619,11 +3646,7 @@ function ghostifyReset(implode, gain, amount, force) {
 	}
 	tmp.qu=player.quantum
 	//Pre-infinity
-	if (player.challenges.includes("challenge1")) player.money = new Decimal(100)
-	if (player.achievements.includes("r37")) player.money = new Decimal(1000)
-	if (player.achievements.includes("r54")) player.money = new Decimal(2e5)
-	if (player.achievements.includes("r55")) player.money = new Decimal(1e10)
-	if (player.achievements.includes("r78")) player.money = new Decimal(1e25)
+	setInitialMoney()
 	setInitialDimensionPower()
 	updatePowers()
 	mult18 = new Decimal(1)
@@ -3653,7 +3676,7 @@ function ghostifyReset(implode, gain, amount, force) {
 	document.getElementById("infmultbuyer").textContent="Max buy IP mult"
 	if (implode) showChallengesTab("normalchallenges")
 	updateChallenges()
-	document.getElementById("matter").style.display = "none"
+	updateNCVisuals()
 	updateAutobuyers()
 	hideMaxIDButton()
 	if (!bm) {
@@ -3914,7 +3937,7 @@ function updateGhostifyTabs() {
 		for (var u=1;u<16;u++) {
 			var e=false
 			if (u>12) e=player.ghostify.ghostlyPhotons.unl
-			else e=player.ghostify.times+3>u||u<4
+			else e=player.ghostify.times+3>u||u<5
 			if (e) {
 				if (hasNU(u)) document.getElementById("neutrinoUpg" + u).className = "gluonupgradebought neutrinoupg"
 				else if (sum.gte(tmp.nuc[u])) document.getElementById("neutrinoUpg" + u).className = "gluonupgrade neutrinoupg"
@@ -4203,9 +4226,8 @@ function startEC10() {
 }
 
 function getCPPower(x) {
-	x=new Decimal(tmp.qu.colorPowers[x])
-	x=x.add(1).log10()
-	if (x>1024&&player.aarexModifications.ngudpV) x=Math.pow(x,.9)*2
+	x=Decimal.add(tmp.qu.colorPowers[x],1).log10()
+	if (x>1024&&player.aarexModifications.ngudpV&&!player.aarexModifications.nguepV) x=Math.pow(x,.9)*2
 	return x
 }
 
@@ -4215,7 +4237,7 @@ function updateColorPowers() {
 	if (colorBoosts.r>1.3) colorBoosts.r=Math.sqrt(colorBoosts.r*1.3)
 	if (colorBoosts.r>2.3&&(!player.dilation.active||getTreeUpgradeLevel(2)>7||ghostified)) colorBoosts.r=Math.pow(colorBoosts.r/2.3,0.5*(ghostified&&player.ghostify.neutrinos.boosts>4?1+tmp.nb[4]:1))*2.3
 	if (colorBoosts.g>4.5) colorBoosts.g=Math.sqrt(colorBoosts.g*4.5)
-	if (player.aarexModifications.ngudpV) colorBoosts.g/=2
+	if (player.aarexModifications.ngudpV&&!player.aarexModifications.nguepV) colorBoosts.g=(colorBoosts.g+1)/2
 	let l=Math.sqrt(getCPPower('b'))
 	if (l>Math.log10(1300)) {
 		l=Decimal.pow(l/Math.log10(1300),player.ghostify.ghostlyPhotons.unl?.5+tmp.le[4]/2:.5).times(Math.log10(1300))

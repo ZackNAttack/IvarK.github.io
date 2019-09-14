@@ -1,7 +1,7 @@
 function getDilationMetaDimensionMultiplier () {
 	let pow = 0.1
 	if (player.masterystudies != undefined) if (player.masterystudies.includes("d12")) pow = getNanofieldRewardEffect(4)
-	if (player.aarexModifications.ngudpV) {
+	if (player.aarexModifications.ngudpV&&!player.aarexModifications.nguepV) {
 		let x=3-Math.min(1,Math.log10(1+player.quantum.colorPowers.b.plus(10).log10()))
 		if (player.quantum.colorPowers.b.gt("1e5000")) x-=Math.min(Math.log10(player.quantum.colorPowers.b.log10()-4900)-2,2)/3
 		pow/=x
@@ -259,7 +259,7 @@ function getMetaDimensionProduction(tier) {
 function getExtraDimensionBoostPower() {
 	if (player.currentEternityChall=="eterc14"||inQC(7)) return new Decimal(1)
 	if (inQC(3)) return player.meta.bestAntimatter.pow(Math.pow(player.meta.bestAntimatter.max(1e8).log10()/8,2))
-	return player.meta.bestAntimatter.pow(getExtraDimensionBoostPowerExponent()).plus(1)
+	return Decimal.pow(player.meta.bestAntimatter,getExtraDimensionBoostPowerExponent()).plus(1)
 }
 
 function getExtraDimensionBoostPowerExponent() {
@@ -517,9 +517,15 @@ let quarkGain = function () {
 	if (player.masterystudies) {
 		if (!tmp.qu.times&&!player.ghostify.milestones) return new Decimal(1)
 		if (player.ghostify.milestones) ma = player.meta.bestAntimatter
-		var log = (ma.max(1).log10() - 379.4) / (player.achievements.includes("ng3p63") ? 279.8 : 280)
+		let log = (ma.max(1).log10() - 379.4) / (player.achievements.includes("ng3p63") ? 279.8 : 280)
 		if (log > 1.2) log = log*log/1.2
 		if (log > 738 && !hasNU(8)) log = Math.sqrt(log * 738)
+		if (player.aarexModifications.nguepV&&log>1e4) {
+			let dlog=Math.log10(log)
+			let capped=Math.floor(Math.log10(Math.max(dlog-2,1))/Math.log10(2))
+			dlog=(dlog-Math.pow(2,capped)-2)/Math.pow(2,capped)+capped+3
+			log=Math.pow(10,dlog)
+		}
 		return Decimal.pow(10, log).times(Decimal.pow(2, tmp.qu.multPower.total)).floor()
 	}
 	return Decimal.pow(10, ma.max(1).log(10) / Math.log10(Number.MAX_VALUE) - 1).times(quarkMult()).floor();
@@ -830,6 +836,7 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 		thisInfinityTime: 0,
 		resets: keepABnICs ? 4 : 0,
 		dbPower: player.dbPower,
+        tdBoosts: resetTDBoosts(),
 		tickspeedBoosts: player.tickspeedBoosts !== undefined ? (keepABnICs ? 16 : 0) : undefined,
 		galaxies: keepABnICs ? 1 : 0,
 		galacticSacrifice: resetGalacticSacrifice(),
@@ -866,7 +873,7 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 		overXGalaxies: keepABnICs ? player.overXGalaxies : 0,
 		overXGalaxiesTickspeedBoost: keepABnICs || player.tickspeedBoosts == undefined ? player.overXGalaxiesTickspeedBoost : 0,
 		spreadingCancer: player.spreadingCancer,
-		postChallUnlocked: player.achievements.includes("r133") || bigRip ? 8 : 0,
+		postChallUnlocked: player.achievements.includes("r133") || bigRip ? order.length : 0,
 		postC4Tier: 0,
 		postC3Reward: new Decimal(1),
 		eternityPoints: new Decimal(0),
@@ -982,7 +989,7 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 			bought: 0
 		},
 		timeDimension8: {
-			cost: new Decimal("1e3350"),
+			cost: timeDimCost(8,ghostified&&bigRip?1:0),
 			amount: new Decimal(ghostified&&bigRip?1:0),
 			power: new Decimal(1),
 			bought: ghostified&&bigRip?1:0
@@ -1123,13 +1130,14 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 		aarexModifications: player.aarexModifications
 	};
 	if (player.challenges.includes("challenge1")) player.money = new Decimal(100)
+	if (player.aarexModifications.ngmX>3) player.money = new Decimal(200)
 	if (player.achievements.includes("r37")) player.money = new Decimal(1000)
 	if (player.achievements.includes("r54")) player.money = new Decimal(2e5)
 	if (player.achievements.includes("r55")) player.money = new Decimal(1e10)
 	if (player.achievements.includes("r78")) player.money = new Decimal(1e25)
 	if (player.galacticSacrifice && !keepABnICs) player.autobuyers[12]=13
 	if (player.tickspeedBoosts !== undefined && !keepABnICs) player.autobuyers[13]=14
-	player.challenges=challengesCompletedOnEternity(true)
+	player.challenges=challengesCompletedOnEternity(bigRip)
 	if (bigRip && player.ghostify.milestones > 9 && player.aarexModifications.ngudpV) for (var u=7;u<10;u++) player.eternityUpgrades.push(u)
 	if (isRewardEnabled(11) && (bigRip ? tmp.qu.bigRip.upgrades.includes(12) : true)) {
 		if (player.eternityChallUnlocked>12) player.timestudy.theorem+=masterystudies.costs.ec[player.eternityChallUnlocked]
@@ -1166,10 +1174,11 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 				g[p[c]]=g[p[c]].add(d[c]).round()
 				u[p[c][0]]=u[p[c][0]].sub(d[c]).round()
 			}
-			var intensity=tmp.qu.challenge.length
-			var qc1=tmp.qu.challenge[0]
-			var qc2=tmp.qu.challenge[1]
-			if (getCurrentQCData().length>1) {
+			var qc=getCurrentQCData()
+			var intensity=qc.length
+			var qc1=qc[0]
+			var qc2=qc[1]
+			if (intensity>1) {
 				if (tmp.qu.pairedChallenges.current>tmp.qu.pairedChallenges.completed) {
 					tmp.qu.challenges[qc1]=2
 					tmp.qu.challenges[qc2]=2
@@ -1188,7 +1197,7 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 				}
 				if (tmp.qu.pairedChallenges.fastest[pcid] === undefined) tmp.qu.pairedChallenges.fastest[pcid] = oldTime
 				else tmp.qu.pairedChallenges.fastest[pcid] = tmp.qu.pairedChallenges.fastest[pcid] = Math.min(tmp.qu.pairedChallenges.fastest[pcid], oldTime)
-			} else if (intensity>0) {
+			} else if (intensity) {
 				if (!tmp.qu.challenges[qc1]) {
 					tmp.qu.challenges[qc1]=1
 					tmp.qu.electrons.mult+=0.25
@@ -1325,23 +1334,16 @@ function quantumReset(force, auto, challid, bigRip, implode=false) {
 	updateRespecButtons()
 	if (player.achievements.includes("r36")) player.tickspeed = player.tickspeed.times(0.98);
 	if (player.achievements.includes("r45")) player.tickspeed = player.tickspeed.times(0.98);
-	if (inQC(6)) document.getElementById("matter").style.display = "block";
-	else document.getElementById("matter").style.display = "none";
-       if (isADSCRunning()) document.getElementById("chall13Mult").style.display = "block";
-       else document.getElementById("chall13Mult").style.display = "none";
-	document.getElementById("quickReset").style.display = "none";
 	if (player.infinitied >= 1 && !player.challenges.includes("challenge1")) player.challenges.push("challenge1");
 	updateAutobuyers();
-	if (player.achievements.includes("r37")) player.money = new Decimal(1000);
-	if (player.achievements.includes("r54")) player.money = new Decimal(2e5);
-	if (player.achievements.includes("r55")) player.money = new Decimal(1e10);
-	if (player.achievements.includes("r78")) player.money = new Decimal(1e25);
+	setInitialMoney()
 	if (player.achievements.includes("r85")) player.infMult = player.infMult.times(4);
 	if (player.achievements.includes("r93")) player.infMult = player.infMult.times(4);
 	if (player.achievements.includes("r104")) player.infinityPoints = new Decimal(2e25);
 	if (player.achievements.includes("r142")) player.meta.antimatter = new Decimal(100);
 	resetInfDimensions();
 	updateChallenges();
+	updateNCVisuals()
 	updateChallengeTimes()
 	updateLastTenRuns()
 	updateLastTenEternities()

@@ -2,13 +2,14 @@
 
 
 function DimensionDescription(tier) {
-  if (tier > (inQC(4) ? 6 : 7) && (ECTimesCompleted("eterc7") === 0 || player.timeDimension1.amount.eq(0) || tier == 7) && player.currentEternityChall != "eterc7") return getFullExpansion(Math.round(player["infinityDimension"+tier].amount.toNumber()));
+  if (tier > (inQC(4) || player.pSac!=undefined ? 6 : 7) && (ECTimesCompleted("eterc7") === 0 || player.timeDimension1.amount.eq(0) || tier == 7) && player.currentEternityChall != "eterc7") return getFullExpansion(Math.round(player["infinityDimension"+tier].amount.toNumber()));
   else return shortenDimensions(player['infinityDimension'+tier].amount)+' (+' + formatValue(player.options.notation, DimensionRateOfChange(tier), 2, 2) + dimDescEnd;
 }
 
 
 function DimensionRateOfChange(tier) {
-  var toGain = DimensionProduction(tier+(inQC(4)&&tier<8?2:1))
+  var toGain = DimensionProduction(tier+((inQC(4)||player.pSac!==undefined)&&tier<8?2:1))
+  if (player.pSac !== undefined) toGain = toGain.div(getEC12Mult())
   var current = Decimal.max(player["infinityDimension"+tier].amount, 1);
   if (player.aarexModifications.logRateChange) {
       var change = current.add(toGain.div(10)).log10()-current.log10()
@@ -40,11 +41,12 @@ function DimensionProduction(tier) {
   var dim = player["infinityDimension"+tier]
   var ret = dim.amount
   if (inQC(4) && tier == 1) ret = ret.plus(player.infinityDimension2.amount.floor())
+  if (player.tickspeedBoosts !== undefined && player.currentChallenge == "postc2") return new Decimal(0)
   if (player.currentEternityChall == "eterc11") return ret
-  if (player.currentEternityChall == "eterc7" && player.galacticSacrifice) ret = dilates(ret.dividedBy(player.tickspeed.dividedBy(1000)))
-  else if (player.currentEternityChall == "eterc7") ret = ret.dividedBy(player.tickspeed.dividedBy(1000))
-  if (player.aarexModifications.ngm4V) ret = ret.div(100)
+  if (player.currentEternityChall == "eterc7") ret = dilates(ret.dividedBy(player.tickspeed.dividedBy(1000)))
+  if (player.aarexModifications.ngmX>3) ret = ret.div(100)
   ret = ret.times(DimensionPower(tier))
+  if (player.pSac!=undefined) ret = ret.times(player.chall2Pow)
   if (player.challenges.includes("postc6")&&!inQC(3)) return ret.times(Decimal.div(1000, dilates(player.tickspeed)).pow(0.0005))
   return ret
 }
@@ -58,6 +60,9 @@ function DimensionPower(tier) {
   var mult = dim.power
 
   mult = mult.times(infDimPow)
+
+  if (hasPU(31)) mult = mult.times(puMults[31]())
+  if (player.pSac !== undefined) if (tier==2) mult = mult.pow(puMults[13](hasPU(13, true, true)))
 
   if (player.achievements.includes("r94") && tier == 1) mult = mult.times(2);
   if (player.achievements.includes("r75") && !player.boughtDims) mult = mult.times(player.achPow);
@@ -92,85 +97,45 @@ function DimensionPower(tier) {
 
   if (inQC(6)) mult = mult.times(player.postC8Mult).dividedBy(player.matter.max(1))
 
-  if (player.galacticSacrifice || player.dilation.active) mult = dilates(mult)
+  mult = dilates(mult, 2)
   if (player.replicanti.unl && player.replicanti.amount.gt(1) && player.galacticSacrifice !== undefined) mult = mult.times(getIDReplMult())
   if (player.galacticSacrifice !== undefined) mult = mult.times(ec9)
-  return mult
+
+  return dilates(mult, 1)
 }
 
 
 
 
 function resetInfDimensions() {
-
-  if (player.infDimensionsUnlocked[0]) {
-      player.infinityPower = new Decimal(0)
-  }
-  if (player.infDimensionsUnlocked[7] && player.infinityDimension6.amount != 0 && ECTimesCompleted("eterc7") > 0){
-      player.infinityDimension8.amount = new Decimal(player.infinityDimension8.baseAmount)
-      player.infinityDimension7.amount = new Decimal(player.infinityDimension7.baseAmount)
-      player.infinityDimension6.amount = new Decimal(player.infinityDimension6.baseAmount)
-      player.infinityDimension5.amount = new Decimal(player.infinityDimension5.baseAmount)
-      player.infinityDimension4.amount = new Decimal(player.infinityDimension4.baseAmount)
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  if (player.infDimensionsUnlocked[7] && player.infinityDimension6.amount != 0){
-      player.infinityDimension7.amount = new Decimal(player.infinityDimension7.baseAmount)
-      player.infinityDimension6.amount = new Decimal(player.infinityDimension6.baseAmount)
-      player.infinityDimension5.amount = new Decimal(player.infinityDimension5.baseAmount)
-      player.infinityDimension4.amount = new Decimal(player.infinityDimension4.baseAmount)
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  if (player.infDimensionsUnlocked[6] && player.infinityDimension6.amount != 0){
-      player.infinityDimension6.amount = new Decimal(player.infinityDimension6.baseAmount)
-      player.infinityDimension5.amount = new Decimal(player.infinityDimension5.baseAmount)
-      player.infinityDimension4.amount = new Decimal(player.infinityDimension4.baseAmount)
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  if (player.infDimensionsUnlocked[5] && player.infinityDimension6.amount != 0){
-      player.infinityDimension5.amount = new Decimal(player.infinityDimension5.baseAmount)
-      player.infinityDimension4.amount = new Decimal(player.infinityDimension4.baseAmount)
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  if (player.infDimensionsUnlocked[4] && player.infinityDimension5.amount != 0){
-      player.infinityDimension4.amount = new Decimal(player.infinityDimension4.baseAmount)
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  if (player.infDimensionsUnlocked[3] && player.infinityDimension4.amount != 0){
-      player.infinityDimension3.amount = new Decimal(player.infinityDimension3.baseAmount)
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  else if (player.infDimensionsUnlocked[2] && player.infinityDimension3.amount != 0){
-      player.infinityDimension2.amount = new Decimal(player.infinityDimension2.baseAmount)
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-  else if (player.infDimensionsUnlocked[1] && player.infinityDimension2.amount != 0){
-      player.infinityDimension1.amount = new Decimal(player.infinityDimension1.baseAmount)
-  }
-
+	for (var t=1;t<9;t++) {
+		if (player.infDimensionsUnlocked[t-1]) player["infinityDimension"+t].amount = new Decimal(player["infinityDimension"+t].baseAmount)
+	}
+	if (player.infDimensionsUnlocked[0]) player.infinityPower = new Decimal(0)
+	resetIDs_ngm5()
 }
 
 var infCostMults = [null, 1e3, 1e6, 1e8, 1e10, 1e15, 1e20, 1e25, 1e30]
 var infPowerMults = [[null, 50, 30, 10, 5, 5, 5, 5, 5], [null, 500, 300, 100, 50, 25, 10, 5, 5]]
 var infBaseCost = [null, 1e8, 1e9, 1e10, 1e20, 1e140, 1e200, 1e250, 1e280]
+function getIDCost(tier) {
+	let ret=player["infinityDimension"+tier].cost
+	if (player.galacticSacrifice !== undefined && player.achievements.includes("r123")) ret=ret.div(galMults.u11())
+	return ret
+}
 
 function getIDCostMult(tier) {
 	let ret=infCostMults[tier]
-	if (player.infinityUpgrades.includes("postinfi53")) ret/=50
 	if (ECTimesCompleted("eterc12")) ret=Math.pow(ret,getECReward(12))
-	if (player.galacticSacrifice!==undefined&&player.galacticSacrifice.upgrades.includes(42)) ret/=1+5*Math.log10(player.eternityPoints.plus(1).log10()+1)
-	return Math.max(ret,Math.pow(infCostMults[tier],.1))
+	if (player.galacticSacrifice==undefined) return ret
+	if (player.infinityUpgrades.includes("postinfi53")) ret/=50
+	if (player.galacticSacrifice.upgrades.includes(42)) ret/=1+5*Math.log10(player.eternityPoints.plus(1).log10()+1)
+	let cap = .1
+	if (player.achPow.gte(Decimal.pow(5,11.9))) {
+		cap = .02
+		ret /= Math.max(1,Math.log(player.totalmoney.log10())/10-.5)
+	}
+	return Math.max(ret,Math.pow(infCostMults[tier],cap))
 }
 
 function getInfBuy10Mult(tier) {
@@ -180,17 +145,20 @@ function getInfBuy10Mult(tier) {
 }
 
 function buyManyInfinityDimension(tier) {
+  if (player.pSac !== undefined) buyIDwithAM(tier)
   if (player.eterc8ids <= 0 && player.currentEternityChall == "eterc8") return false
   var dim = player["infinityDimension"+tier]
-  if (player.infinityPoints.lt(dim.cost)) return false
+  var cost = getIDCost(tier)
+  if (player.infinityPoints.lt(cost)) return false
   if (!player.infDimensionsUnlocked[tier-1]) return false
   if (player.eterc8ids == 0) return false
-  if (player.infinityPoints.lt(Decimal.pow(10, 1e10))) player.infinityPoints = player.infinityPoints.minus(dim.cost)
+  if (player.infinityPoints.lt(Decimal.pow(10, 1e10))) player.infinityPoints = player.infinityPoints.minus(cost)
   dim.amount = dim.amount.plus(10);
   dim.cost = Decimal.round(dim.cost.times(getIDCostMult(tier)))
   dim.power = dim.power.times(getInfBuy10Mult(tier))
   dim.baseAmount += 10
 
+  if (player.pSac!=undefined) player.chall2Pow=0
   if (player.currentEternityChall == "eterc8") player.eterc8ids-=1
   document.getElementById("eterc8ids").textContent = "You have "+player.eterc8ids+" purchases left."
   if (inQC(6)) player.postC8Mult = new Decimal(1)
@@ -199,14 +167,14 @@ function buyManyInfinityDimension(tier) {
 
 function buyMaxInfDims(tier) {
   var dim = player["infinityDimension"+tier]
-
-  if (player.infinityPoints.lt(dim.cost)) return false
+  var cost = getIDCost(tier)
+  if (player.infinityPoints.lt(cost)) return false
   if (!player.infDimensionsUnlocked[tier-1]) return false
 
   var costMult=getIDCostMult(tier)
-  var toBuy = Math.floor((player.infinityPoints.e - dim.cost.e) / Math.log10(costMult))
+  var toBuy = Math.floor(player.infinityPoints.div(cost).log10() / Math.log10(costMult))
   dim.cost = dim.cost.times(Decimal.pow(costMult, toBuy-1))
-  if (player.infinityPoints.lt(Decimal.pow(10, 1e10))) player.infinityPoints = player.infinityPoints.minus(dim.cost.min(player.infinityPoints))
+  if (player.infinityPoints.lt(Decimal.pow(10, 1e10))) player.infinityPoints = player.infinityPoints.minus(getIDCost(tier).min(player.infinityPoints))
   dim.cost = dim.cost.times(costMult)
   dim.amount = dim.amount.plus(10*toBuy);
   dim.power = dim.power.times(Decimal.pow(getInfBuy10Mult(tier), toBuy))
@@ -214,11 +182,22 @@ function buyMaxInfDims(tier) {
   buyManyInfinityDimension(tier)
 }
 
+function getInfinityPowerEffect() {
+	if (player.currentEternityChall == "eterc9") return Decimal.pow(Math.max(player.infinityPower.log2(),1),player.galacticSacrifice==undefined?4:30).max(1)
+	let log = player.infinityPower.max(1).log10()
+	log *= getInfinityPowerEffectPower()
+	if (hasPU(34)) log *= puMults[34]()
+	if (log > 10 && player.pSac !== undefined) log = Math.pow(log * 200 - 1e3, 1/3)
+	return Decimal.pow(10, log)
+}
+
 function getInfinityPowerEffectPower() {
 	if (player.galacticSacrifice!=undefined) {
-		let ret=Math.pow(player.galaxies, 0.7)
+		let ret=Math.pow(player.galaxies,0.7)
 		if (player.currentChallenge=="postcngm3_2"||(player.tickspeedBoosts!=undefined&&player.currentChallenge=="postc1")) ret=player.galaxies
 		else if (player.challenges.includes("postcngm3_2")) ret=Math.pow(player.galaxies+(player.resets+player.tickspeedBoosts)/30,0.7)
+		let min=7
+		if (player.pSac!==undefined) min=3
 		return Math.max(ret,7)
 	}
 	return 7
